@@ -1,0 +1,4 @@
+yolov12_env/
+__pycache__/
+*.pyc
+.idea/
