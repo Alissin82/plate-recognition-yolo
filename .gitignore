@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .idea/
 /yolov12_p310_env/
+/yolov7/
