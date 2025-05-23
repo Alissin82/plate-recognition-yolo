@@ -77,3 +77,69 @@ Inside the `yolov7/` directory:
 ```powershell
 pip install -r requirements.txt
 ```
+
+---
+
+### 7. Install Roboflow Python SDK
+
+```powershell
+pip install roboflow
+```
+
+---
+
+## 📥 Download Dataset from Roboflow
+
+You can download the dataset either locally or via Google Colab depending on your network accessibility.
+
+---
+
+### Option A: Local Download (If Accessible)
+
+In your Python script:
+
+```python
+from roboflow import Roboflow
+
+rf = Roboflow(api_key="your-api-key")
+project = rf.workspace("object-recognition-yolo").project("anpr_ir-rsiqu")
+version = project.version(1)
+dataset = version.download("yolov8", location="C:/Users/Alissin/Desktop/UNI/plate-recognition-yolo/yolov7/roboflow_dataset")
+```
+
+> ⚠️ This may not work in some countries (e.g., Iran) due to network restrictions.
+
+---
+
+### Option B: Download via Google Colab (Recommended if A Fails)
+
+1. Open [Google Colab](https://colab.research.google.com/)
+2. Mount Google Drive:
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+3. Install Roboflow:
+
+```bash
+!pip install roboflow
+```
+
+4. Run the Roboflow download code:
+
+```python
+from roboflow import Roboflow
+rf = Roboflow(api_key="your-api-key")
+project = rf.workspace("object-recognition-yolo").project("anpr_ir-rsiqu")
+version = project.version(1)
+dataset = version.download("yolov8", location="/content/drive/MyDrive/roboflow_dataset")
+```
+
+5. Go to Google Drive → Locate the `roboflow_dataset` folder → Download it.
+6. Place the dataset manually inside:
+
+```
+yolov7/roboflow_dataset
+```
