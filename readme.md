@@ -8,6 +8,8 @@ Make sure Python 3.10 is installed on your system.
 You can download it from:  
 [https://www.python.org/downloads/release/python-3100/](https://www.python.org/downloads/release/python-3100/)
 
+Don't click on add to path if you don't want it to be your default python
+
 ---
 
 ### 2. Create Virtual Environment
