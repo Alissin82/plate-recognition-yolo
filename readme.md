@@ -143,3 +143,58 @@ dataset = version.download("yolov8", location="/content/drive/MyDrive/roboflow_d
 ```
 yolov7/roboflow_dataset
 ```
+
+---
+
+## 📦 Download Pretrained YOLOv7 Weights
+YOLOv7 provides pretrained weights (yolov7.pt) which are used to initialize the model before fine-tuning on your own dataset. This helps the model converge faster and improves performance, especially when your dataset is small.
+
+These weights were trained on the COCO dataset and provide strong general features for object detection.
+
+### PowerShell Instructions (for Windows)
+⬇️ Download into the current yolov7 folder:
+
+```bash
+Invoke-WebRequest -Uri "https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7.pt" -OutFile "yolov7.pt"
+```
+
+---
+
+## 🎯 Training the YOLOv7 Model
+
+### 1. Update data.yaml
+
+from
+```
+test: ../test/images
+train: ../train/images
+val: ../valid/images
+```
+to
+```
+test: ./roboflow_dataset/test/images
+train: ./roboflow_dataset/train/images
+val: ./roboflow_dataset/valid/images
+```
+
+
+### 2. Train the Model
+
+Make sure you're inside the `yolov7/` directory and run the following:
+
+```bash
+python train.py \
+  --weights yolov7.pt \
+  --cfg cfg/training/yolov7.yaml \
+  --data roboflow_dataset/data.yaml \
+  --epochs 15 \
+  --batch 4 \
+  --device 0
+```
+
+* `--batch`: Batch size during training
+* `--cfg`: Path to YOLOv7 configuration file
+* `--epochs`: Number of training epochs
+* `--data`: Path to dataset configuration
+* `--weights`: Path to pretrained weights
+* `--device 0`: Use GPU (GPU #0, e.g., RTX 3050)
