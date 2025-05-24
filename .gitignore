@@ -4,3 +4,4 @@ __pycache__/
 /yolov12_p310_env/
 /yolov7/roboflow_dataset/
 /yolov7/runs/
+yolov7/
