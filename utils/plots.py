@@ -75,8 +75,13 @@ def plot_one_box_PIL(box, img, color=None, label=None, line_thickness=None):
     draw.rectangle(box, width=line_thickness, outline=tuple(color))  # plot
     if label:
         fontsize = max(round(max(img.size) / 40), 12)
-        font = ImageFont.truetype("Yekan.ttf", fontsize)
-        txt_width, txt_height = font.getsize(label)
+        font = ImageFont.truetype(r"D:\plate-recognition-yolo-master\plate-recognition-yolo-2\utils\Yekan.ttf", fontsize)
+        try:
+            txt_width, txt_height = font.getsize(label)  # older method
+        except AttributeError:
+            bbox = font.getbbox(label)
+            txt_width = bbox[2] - bbox[0]
+            txt_height = bbox[3] - bbox[1]
         draw.rectangle([box[0], box[1] - txt_height + 4, box[0] + txt_width, box[1]], fill=tuple(color))
         draw.text((box[0], box[1] - txt_height + 1), label, fill=(255, 255, 255), font=font)
     return np.asarray(img)
