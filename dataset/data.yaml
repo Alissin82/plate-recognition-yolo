@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['licence']
+
+roboflow:
+  workspace: object-recognition-yolo
+  project: anpr_ir-rsiqu
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/object-recognition-yolo/anpr_ir-rsiqu/dataset/4
