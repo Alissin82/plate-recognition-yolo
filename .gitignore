@@ -263,4 +263,5 @@ fabric.properties
 # yolo
 /output/
 
-# TODO do not ignore ./dataset/sample/*
+# EXCEPTION: Keep images/videos in dataset/sample/
+!dataset/sample/*
