@@ -262,3 +262,5 @@ fabric.properties
 
 # yolo
 /output/
+
+# TODO do not ignore ./dataset/sample/*
