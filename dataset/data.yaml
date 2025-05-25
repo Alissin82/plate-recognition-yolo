@@ -1,6 +1,6 @@
-train: ../train/images
-val: ../valid/images
-test: ../test/images
+train: ./dataset/train/images
+val: ./dataset/valid/images
+test: ./dataset/test/images
 
 nc: 1
 names: ['licence']
