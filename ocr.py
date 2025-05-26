@@ -39,6 +39,7 @@ if half:
 if device.type != 'cpu':
     model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))
 
+
 def detect_plate(source_image):
     # Padded resize
     img_size = 640
@@ -79,18 +80,6 @@ def detect_plate(source_image):
     return plate_detections, det_confidences
 
 
-def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=2.0, threshold=0):
-    blurred = cv.GaussianBlur(image, kernel_size, sigma)
-    sharpened = float(amount + 1) * image - float(amount) * blurred
-    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
-    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
-    sharpened = sharpened.round().astype(np.uint8)
-    if threshold > 0:
-        low_contrast_mask = np.absolute(image - blurred) < threshold
-        np.copyto(sharpened, image, where=low_contrast_mask)
-    return sharpened
-
-
 def crop(image, coord):
     cropped_image = image[int(coord[1]):int(coord[3]), int(coord[0]):int(coord[2])]
     return cropped_image
@@ -129,8 +118,7 @@ def get_plates_from_image(input):
         plate_text, ocr_confidence = ocr_plate(plate_region)
         plate_texts.append(plate_text)
         ocr_confidences.append(ocr_confidence)
-        detected_image = plot_one_box_PIL(coords, detected_image, label=plate_text, color=[0, 150, 255],
-                                          line_thickness=2)
+        detected_image = plot_one_box_PIL(coords, detected_image, label=plate_text, color=[0, 150, 255],line_thickness=2)
     return detected_image
 
 
