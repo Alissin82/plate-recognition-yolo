@@ -19,12 +19,24 @@ args = parser.parse_args()  # Parse the arguments
 output_path = Path("./output")
 output_path.mkdir(parents=True, exist_ok=True)
 
+# Parameters (extracted from Parameters class)
+imgsz = 640  # Input image size for YOLO models
+conf_thres = 0.25  # Confidence threshold for detection
+cpu_or_cuda = "cpu"  # Device to use (can be "cuda" if GPU is available)
+
 # Paths to the pre-trained YOLO models
-plate_model_path = "./runs/train/exp/weights/best.pt"  # Path to the plate detection model
-char_model_path = "./runs/characters.pt"  # Path to the character detection model (not used yet)
+modelPlate_path = "./runs/train/exp/weights/best.pt"  # Path to the plate detection model
+modelCharX_path = "./runs/characters.pt"  # Path to the character detection model (not used yet)
+# Dictionary to map class IDs to characters (based on your previous config)
+char_id_dict = {
+    '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
+    '10': 'الف', '11': 'ب', '12': 'پ', '13': 'تاکسی', '14': 'ث', '15': 'ج', '16': 'چ', '17': 'ح', '18': 'خ',
+    '19': 'د', '20': 'ذ', '21': 'ر', '22': 'ز', '23': 'ژ', '24': 'سین', '25': 'ش', '26': 'ص', '27': 'ض',
+    '28': 'ط', '29': 'ظ', '30': 'ع', '31': 'غ', '32': 'ف', '33': 'ق', '34': 'ک', '35': 'گ', '36': 'ل',
+    '37': 'م', '38': 'ن', '39': 'ه', '40': 'و', '41': 'ی', '42': 'معلول'
+}  # Adjusted based on your config's char_dict
 
-
-def load_yolo(weights_path: str, device, img_size=640):
+def load_yolo(weights_path: str, device, img_size=imgsz):
     """Load a YOLO model with TracedModel and set it to evaluation mode.
 
     Args:
@@ -64,10 +76,10 @@ def preprocess_image(image: np.ndarray, device):
         device: The device to move the tensor to
 
     Returns:
-        torch.Tensor: Preprocessed image tensor
+        torch.Tensor: Preprocessed image tensor, and original image
     """
     img0 = image.copy()  # Keep original image for drawing
-    img = letterbox(img0, new_shape=640, stride=32)[0]  # Resize image to 640x640 with padding
+    img = letterbox(img0, new_shape=imgsz, stride=32)[0]  # Resize image to imgsz with padding
     img = img[:, :, ::-1].transpose(2, 0, 1)  # Convert BGR to RGB and change dimensions
     img = np.ascontiguousarray(img)  # Ensure contiguous array for torch
     img = torch.from_numpy(img).to(device).float() / 255.0  # Convert to tensor and normalize
@@ -89,16 +101,16 @@ def detect_plates(plate_model, img_tensor, original_shape):
     """
     with torch.no_grad():  # Disable gradient calculation for inference
         pred = plate_model(img_tensor)[0]  # Get predictions
-    pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.45, classes=0)  # Filter predictions
+    pred = non_max_suppression(pred, conf_thres=conf_thres, iou_thres=0.45, classes=0)  # Filter predictions
 
     plates = []
     for det in pred:
         if det is not None and len(det):
-            det[:, :4] = scale_coords(img_tensor.shape[2:], det[:, :4],
-                                      original_shape).round()  # Scale coordinates back
+            det[:, :4] = scale_coords(img_tensor.shape[2:], det[:, :4], original_shape).round()  # Scale coordinates back
             for *xyxy, conf, cls in det:
                 plates.append((xyxy, conf.item()))  # Store coordinates and confidence
     return plates
+
 
 def preprocess_cropped_plate(cropped_plate: np.ndarray):
     """Perform basic preprocessing on the cropped plate image.
@@ -121,7 +133,7 @@ def preprocess_cropped_plate(cropped_plate: np.ndarray):
     return preprocessed_plate
 
 def crop_and_save_plate(original_image, plates, save_path=output_path):
-    """Crop the first detected plate, preprocess it, and save it along with the detected image.
+    """Crop the first detected plate, preprocess it, detect characters, and save results.
 
     Args:
         original_image (numpy.ndarray): The original image
@@ -145,11 +157,10 @@ def crop_and_save_plate(original_image, plates, save_path=output_path):
     cv.imwrite(str(cropped_path), preprocessed_plate)
     print(f"Preprocessed cropped plate saved to {cropped_path} with confidence {conf:.2f}")
 
-    # Draw bounding box on original image for verification
+    # Draw bounding box and text on original image
     img_with_box = original_image.copy()
     cv.rectangle(img_with_box, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Draw green rectangle
-    cv.putText(img_with_box, f"Conf: {conf:.2f}%", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0),
-               2)  # Add confidence text
+    cv.putText(img_with_box, f"Conf: {conf:.2f}%", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)  # Add confidence text
     out_path = save_path / f"{Path(args.image).stem}_detected.png"
     cv.imwrite(str(out_path), img_with_box)
     print(f"Detected plate saved to {out_path}")
@@ -167,8 +178,8 @@ def main():
     if image is None:
         return
 
-    device = select_device("0" if torch.cuda.is_available() else "cpu")
-    plate_model = load_yolo(plate_model_path, device)
+    device = select_device(cpu_or_cuda)
+    plate_model = load_yolo(modelPlate_path, device)
     img_tensor, img0 = preprocess_image(image, device)
     plates = detect_plates(plate_model, img_tensor, image.shape)
     crop_and_save_plate(img0, plates, output_path)
