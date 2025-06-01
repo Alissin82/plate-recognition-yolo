@@ -100,9 +100,28 @@ def detect_plates(plate_model, img_tensor, original_shape):
                 plates.append((xyxy, conf.item()))  # Store coordinates and confidence
     return plates
 
+def preprocess_cropped_plate(cropped_plate: np.ndarray):
+    """Perform basic preprocessing on the cropped plate image.
+
+    Args:
+        cropped_plate (numpy.ndarray): The cropped plate image
+
+    Returns:
+        numpy.ndarray: Preprocessed plate image
+    """
+    # Convert to grayscale for better processing
+    gray_plate = cv.cvtColor(cropped_plate, cv.COLOR_BGR2GRAY)
+
+    # Optional: Apply simple contrast adjustment (e.g., CLAHE for better visibility)
+    clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    preprocessed_plate = clahe.apply(gray_plate)
+
+    # Convert back to BGR for consistency with original image
+    preprocessed_plate = cv.cvtColor(preprocessed_plate, cv.COLOR_GRAY2BGR)
+    return preprocessed_plate
 
 def crop_and_save_plate(original_image, plates, save_path=output_path):
-    """Crop the first detected plate and save it along with the detected image.
+    """Crop the first detected plate, preprocess it, and save it along with the detected image.
 
     Args:
         original_image (numpy.ndarray): The original image
@@ -113,15 +132,18 @@ def crop_and_save_plate(original_image, plates, save_path=output_path):
         print("No detected plates")
         return
 
-    # Crop the first detected plate (for now, only the first one is processed)
+    # Crop the first detected plate
     xyxy, conf = plates[0]
     x1, y1, x2, y2 = map(int, xyxy)  # Convert coordinates to integers
     cropped_plate = original_image[y1:y2, x1:x2]  # Crop the plate region
 
-    # Save the cropped plate for debugging
+    # Preprocess the cropped plate
+    preprocessed_plate = preprocess_cropped_plate(cropped_plate)
+
+    # Save the preprocessed cropped plate for debugging
     cropped_path = save_path / f"{Path(args.image).stem}_cropped.jpg"
-    cv.imwrite(str(cropped_path), cropped_plate)
-    print(f"Cropped plate saved to {cropped_path} with confidence {conf:.2f}")
+    cv.imwrite(str(cropped_path), preprocessed_plate)
+    print(f"Preprocessed cropped plate saved to {cropped_path} with confidence {conf:.2f}")
 
     # Draw bounding box on original image for verification
     img_with_box = original_image.copy()
