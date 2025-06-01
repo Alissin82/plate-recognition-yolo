@@ -1,168 +1,109 @@
-import os
-from pathlib import Path
-import torch
+import argparse
 import cv2 as cv
+from pathlib import Path
 import numpy as np
-from deep_sort_realtime.deepsort_tracker import DeepSort
+import torch
+
 from models.experimental import attempt_load
-from utils.general import check_img_size
-from utils.torch_utils import select_device, TracedModel
 from utils.datasets import letterbox
 from utils.general import non_max_suppression, scale_coords
-from utils.plots import plot_one_box_PIL
-from copy import deepcopy
-import platform
-import argparse
-import subprocess
-import torchvision.transforms as transforms
-from torch import nn
-from PIL import Image
+from utils.torch_utils import TracedModel, select_device
 
-# Device setup
-device = select_device("cpu")
-half = device.type != 'cpu'
-image_size = 640
-trace = True
+# Define the output directory path and create it if it doesn't exist
+output_path = Path("./output")
+output_path.mkdir(parents=True, exist_ok=True)
 
-# Model loading
-model = attempt_load('./runs/train/exp/weights/best.pt', map_location=device)
-stride = int(model.stride.max())
-imgsz = check_img_size(image_size, s=stride)
+# Paths to the pre-trained YOLO models
+plate_model_path = "./runs/train/exp/weights/best.pt"  # Path to the plate detection model
+char_model_path = "./runs/characters.pt"  # Path to the character detection model (not used yet)
 
-if trace:
-    model = TracedModel(model, device, image_size)
 
-if half:
-    model.half()
+def load_yolo(weights_path: str, device, img_size=640):
+    """Load a YOLO model with TracedModel and set it to evaluation mode.
 
-if device.type != 'cpu':
-    model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))
+    Args:
+        weights_path (str): Path to the model weights file (.pt)
+        device: The device (CPU or GPU) to load the model on
+        img_size (int): Input image size for the model (default: 640)
 
-# Load custom Persian OCR model
-ocr_model_path = Path("./dataset/ocr/model/persian_char_model.pth")
+    Returns:
+        TracedModel: The loaded and traced YOLO model
+    """
+    model = attempt_load(weights_path, map_location=device)  # Load the model weights
+    model = TracedModel(model, device, img_size)  # Trace the model for optimization
+    model.to(device).eval()  # Move to the specified device and set to evaluation mode
+    return model
 
-class SimpleCNN(nn.Module):
-    def __init__(self, num_classes=28):
-        super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
-        self.fc1 = nn.Linear(64 * 14 * 14, 128)
-        self.fc2 = nn.Linear(128, num_classes)
-
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.max_pool2d(x, 2)
-        x = torch.relu(self.conv2(x))
-        x = torch.max_pool2d(x, 2)
-        x = torch.flatten(x, 1)
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-o_model = SimpleCNN()
-o_model.load_state_dict(torch.load(ocr_model_path, map_location=device))
-o_model.eval()
-o_model.to(device)
-
-transform = transforms.Compose([
-    transforms.Resize((64, 64)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5]*3, [0.5]*3)
-])
-
-# Output path
-savepath = Path("./output")
-savepath.mkdir(parents=True, exist_ok=True)
-
-def detect_plate(source_image):
-    img_size = 640
-    stride = 32
-    img = letterbox(source_image, img_size, stride=stride)[0]
-    img = img[:, :, ::-1].transpose(2, 0, 1)
-    img = np.ascontiguousarray(img)
-    img = torch.from_numpy(img).to(device)
-    img = img.half() if half else img.float()
-    img /= 255.0
-    if img.ndimension() == 3:
-        img = img.unsqueeze(0)
-
-    with torch.no_grad():
-        pred = model(img, augment=True)[0]
-
-    pred = non_max_suppression(pred, 0.25, 0.45, classes=0, agnostic=True)
-
-    plate_detections = []
-    det_confidences = []
-
-    for i, det in enumerate(pred):
-        if len(det):
-            det[:, :4] = scale_coords(img.shape[2:], det[:, :4], source_image.shape).round()
-            for *xyxy, conf, cls in reversed(det):
-                coords = [int(position) for position in (torch.tensor(xyxy).view(1, 4)).tolist()[0]]
-                plate_detections.append(coords)
-                det_confidences.append(conf.item())
-
-    return plate_detections, det_confidences
-
-def crop(image, coord):
-    return image[int(coord[1]):int(coord[3]), int(coord[0]):int(coord[2])]
-
-def ocr_plate(plate_region):
-    h, w, _ = plate_region.shape
-    char_width = w // 8  # فرض: 8 کاراکتر
-    chars = []
-    for i in range(8):
-        x_start = i * char_width
-        x_end = (i + 1) * char_width
-        char_img = plate_region[:, x_start:x_end]
-        image_pil = Image.fromarray(cv.cvtColor(char_img, cv.COLOR_BGR2RGB))
-        tensor = transform(image_pil).unsqueeze(0).to(device)
-        with torch.no_grad():
-            output = o_model(tensor)
-            pred = torch.argmax(output, dim=1)
-            chars.append(str(pred.item()))  # یا نگاشت عدد به کاراکتر فارسی
-    return ''.join(chars), 1.0
-
-def get_plates_from_image(input_img, filename):
-    if input_img is None:
-        return None
-
-    plate_detections, det_confidences = detect_plate(input_img)
-    plate_texts = []
-    ocr_confidences = []
-    detected_image = deepcopy(input_img)
-
-    for coords in plate_detections:
-        plate_region = crop(input_img, coords)
-        plate_text, ocr_confidence = ocr_plate(plate_region)
-        plate_texts.append(plate_text)
-        ocr_confidences.append(ocr_confidence)
-        detected_image = plot_one_box_PIL(coords, detected_image, label=plate_text, color=[0, 150, 255], line_thickness=2)
-        print(f"Detected plate text: {plate_text} with OCR confidence: {ocr_confidence}")
-
-    output_filename = savepath / f"{Path(filename).stem}_detected.png"
-    cv.imwrite(str(output_filename), detected_image)
-    subprocess.run(f'explorer "{savepath}"', shell=True)
-    print(f"Saved detected image to {output_filename}")
-
-    return detected_image
 
 def main():
+    # Create argument parser to handle command-line inputs
     parser = argparse.ArgumentParser(description="License Plate Recognition CLI")
-    parser.add_argument("--image", help="Path to an image file")
+    parser.add_argument("--image", help="Path to an image file")  # Argument for input image path
 
-    args = parser.parse_args()
+    args = parser.parse_args()  # Parse the arguments
 
+    # Check if an image path is provided
     if not args.image:
         print("Please provide --image for input.")
         return
 
+    # Read the input image
     plate_image = cv.imread(args.image)
     if plate_image is None:
-        print(f"Error: Could not read image {args.image}")
+        print(f"Error: Could not read image {args.image}")  # Error if image fails to load
         return
 
-    get_plates_from_image(plate_image, args.image)
+    # Set up the device (GPU if available, otherwise CPU)
+    device = select_device("0" if torch.cuda.is_available() else "cpu")
+
+    # Load the YOLOv7 model for plate detection
+    plate_model = load_yolo(plate_model_path, device)
+
+    # Create a copy of the original image and preprocess it for YOLO detection
+    img0 = plate_image.copy()  # Keep original image for drawing
+    img = letterbox(img0, new_shape=640, stride=32)[0]  # Resize image to 640x640 with padding
+    img = img[:, :, ::-1].transpose(2, 0, 1)  # Convert BGR to RGB and change dimensions
+    img = np.ascontiguousarray(img)  # Ensure contiguous array for torch
+    img = torch.from_numpy(img).to(device).float() / 255.0  # Convert to tensor and normalize
+    if img.ndimension() == 3:
+        img = img.unsqueeze(0)  # Add batch dimension if needed
+
+    # Perform plate detection using the YOLO model
+    with torch.no_grad():  # Disable gradient calculation for inference
+        pred = plate_model(img)[0]  # Get predictions
+    pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.45, classes=0)  # Filter predictions
+
+    # Extract detected plates with their confidence scores
+    plates = []
+    for det in pred:
+        if det is not None and len(det):
+            det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()  # Scale coordinates back
+            for *xyxy, conf, cls in det:
+                plates.append((xyxy, conf.item()))  # Store coordinates and confidence
+
+    # Check if any plates were detected
+    if not plates:
+        print("No detected plates")
+        return
+
+    # Crop the first detected plate (for now, only the first one is processed)
+    xyxy, conf = plates[0]
+    x1, y1, x2, y2 = map(int, xyxy)  # Convert coordinates to integers
+    cropped_plate = img0[y1:y2, x1:x2]  # Crop the plate region from the original image
+
+    # Save the cropped plate for debugging purposes
+    cropped_path = output_path / f"{Path(args.image).stem}_cropped.jpg"
+    cv.imwrite(str(cropped_path), cropped_plate)
+    print(f"Cropped plate saved to {cropped_path} with confidence {conf:.2f}")
+
+    # Optional: Draw bounding box on the original image for verification
+    cv.rectangle(img0, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Draw green rectangle
+    cv.putText(img0, f"Conf: {conf:.2f}%", (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0),
+               2)  # Add confidence text
+    out_path = output_path / f"{Path(args.image).stem}_detected.png"
+    cv.imwrite(str(out_path), img0)
+    print(f"Detected plate saved to {out_path}")
+
 
 if __name__ == "__main__":
     main()
