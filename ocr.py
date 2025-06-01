@@ -42,7 +42,7 @@ if device.type != 'cpu':
 ocr_model_path = Path("./dataset/ocr/model/persian_char_model.pth")
 
 class SimpleCNN(nn.Module):
-    def __init__(self, num_classes=3):
+    def __init__(self, num_classes=28):
         super(SimpleCNN, self).__init__()
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1)
