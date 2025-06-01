@@ -265,3 +265,4 @@ fabric.properties
 
 # EXCEPTION: Keep images/videos in dataset/sample/
 !dataset/sample/*
+/dataset/ocr/
