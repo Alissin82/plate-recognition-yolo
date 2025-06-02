@@ -26,15 +26,6 @@ cpu_or_cuda = "cpu"  # Device to use (can be "cuda" if GPU is available)
 
 # Paths to the pre-trained YOLO models
 modelPlate_path = "./runs/train/exp/weights/best.pt"  # Path to the plate detection model
-modelCharX_path = "./runs/characters.pt"  # Path to the character detection model (not used yet)
-# Dictionary to map class IDs to characters (based on your previous config)
-char_id_dict = {
-    '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
-    '10': 'الف', '11': 'ب', '12': 'پ', '13': 'تاکسی', '14': 'ث', '15': 'ج', '16': 'چ', '17': 'ح', '18': 'خ',
-    '19': 'د', '20': 'ذ', '21': 'ر', '22': 'ز', '23': 'ژ', '24': 'سین', '25': 'ش', '26': 'ص', '27': 'ض',
-    '28': 'ط', '29': 'ظ', '30': 'ع', '31': 'غ', '32': 'ف', '33': 'ق', '34': 'ک', '35': 'گ', '36': 'ل',
-    '37': 'م', '38': 'ن', '39': 'ه', '40': 'و', '41': 'ی', '42': 'معلول'
-}  # Adjusted based on your config's char_dict
 
 def load_yolo(weights_path: str, device, img_size=imgsz):
     """Load a YOLO model with TracedModel and set it to evaluation mode.
